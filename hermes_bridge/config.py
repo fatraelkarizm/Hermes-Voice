@@ -29,6 +29,8 @@ class DiscordSettings:
     openwakeword_inference_framework: str = "onnx"
     wake_greeting: str = "Hi, What Can I Help You?"
     reply_timeout_seconds: float = 12.0
+    follow_up_enabled: bool = True
+    follow_up_prompt: str = "Anything else?"
     auto_voice_max_seconds: float = 8.0
     auto_voice_silence_seconds: float = 1.2
     auto_voice_silence_threshold: float = 0.012
@@ -72,6 +74,13 @@ def load_settings(env_path: str | Path = ".env") -> DiscordSettings:
     )
     reply_timeout_seconds_text = (
         values.get("HERMES_REPLY_TIMEOUT_SECONDS", "12.0").strip() or "12.0"
+    )
+    follow_up_enabled_text = (
+        values.get("HERMES_FOLLOW_UP_ENABLED", "true").strip() or "true"
+    )
+    follow_up_prompt = (
+        values.get("HERMES_FOLLOW_UP_PROMPT", "Anything else?").strip()
+        or "Anything else?"
     )
     auto_voice_max_seconds_text = (
         values.get("HERMES_AUTO_VOICE_MAX_SECONDS", "8.0").strip() or "8.0"
@@ -128,6 +137,7 @@ def load_settings(env_path: str | Path = ".env") -> DiscordSettings:
     reply_timeout_seconds = _parse_positive_float(
         "HERMES_REPLY_TIMEOUT_SECONDS", reply_timeout_seconds_text
     )
+    follow_up_enabled = _parse_bool("HERMES_FOLLOW_UP_ENABLED", follow_up_enabled_text)
     auto_voice_max_seconds = _parse_positive_float(
         "HERMES_AUTO_VOICE_MAX_SECONDS", auto_voice_max_seconds_text
     )
@@ -158,6 +168,8 @@ def load_settings(env_path: str | Path = ".env") -> DiscordSettings:
         openwakeword_inference_framework=openwakeword_inference_framework,
         wake_greeting=wake_greeting,
         reply_timeout_seconds=reply_timeout_seconds,
+        follow_up_enabled=follow_up_enabled,
+        follow_up_prompt=follow_up_prompt,
         auto_voice_max_seconds=auto_voice_max_seconds,
         auto_voice_silence_seconds=auto_voice_silence_seconds,
         auto_voice_silence_threshold=auto_voice_silence_threshold,

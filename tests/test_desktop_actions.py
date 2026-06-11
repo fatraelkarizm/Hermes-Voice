@@ -1,4 +1,8 @@
-from hermes_bridge.desktop_actions import DesktopActionRunner, parse_desktop_action
+from hermes_bridge.desktop_actions import (
+    DesktopActionRunner,
+    parse_desktop_action,
+    parse_reply_action,
+)
 
 
 def test_parse_desktop_action_opens_known_website():
@@ -29,6 +33,22 @@ def test_parse_desktop_action_rejects_unknown_commands():
     assert parse_desktop_action("delete system32") is None
 
 
+def test_parse_reply_action_opens_agent_browser_navigate_url():
+    action = parse_reply_action('browser_navigate: "https://www.youtube.com/"')
+
+    assert action is not None
+    assert action.kind == "url"
+    assert action.target == "https://www.youtube.com/"
+
+
+def test_parse_reply_action_opens_done_reply_url():
+    action = parse_reply_action("Done bre, YouTube udah kebuka: https://www.youtube.com/")
+
+    assert action is not None
+    assert action.kind == "url"
+    assert action.target == "https://www.youtube.com/"
+
+
 def test_desktop_action_runner_uses_injected_openers():
     opened_urls = []
     opened_apps = []
@@ -43,3 +63,14 @@ def test_desktop_action_runner_uses_injected_openers():
     assert result.message == "Opening YouTube."
     assert opened_urls == ["https://www.youtube.com"]
     assert opened_apps == []
+
+
+def test_desktop_action_runner_can_run_agent_reply_action():
+    opened_urls = []
+    runner = DesktopActionRunner(open_url=opened_urls.append)
+
+    result = runner.run_reply('browser_navigate: "https://www.youtube.com/"')
+
+    assert result.handled is True
+    assert result.message == "Opened https://www.youtube.com/."
+    assert opened_urls == ["https://www.youtube.com/"]

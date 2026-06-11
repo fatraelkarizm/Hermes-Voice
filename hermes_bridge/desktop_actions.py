@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+import re
 import subprocess
 import webbrowser
 
@@ -64,6 +65,27 @@ def parse_desktop_action(command: str) -> DesktopAction | None:
     return None
 
 
+def parse_reply_action(reply: str) -> DesktopAction | None:
+    text = reply.strip()
+    navigate_match = re.search(
+        r"browser_navigate\s*:\s*[\"'](?P<url>https?://[^\"']+)[\"']",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if navigate_match is not None:
+        url = navigate_match.group("url")
+        return DesktopAction(kind="url", name=url, target=url)
+
+    url_match = re.search(r"https?://[^\s>)\"']+", text)
+    if url_match is not None and re.search(
+        r"\b(done|opened|kebuka|dibuka|buka|open)\b", text, flags=re.IGNORECASE
+    ):
+        url = url_match.group(0)
+        return DesktopAction(kind="url", name=url, target=url)
+
+    return None
+
+
 class DesktopActionRunner:
     def __init__(self, open_url=None, open_app=None) -> None:
         self._open_url = open_url or webbrowser.open
@@ -71,6 +93,15 @@ class DesktopActionRunner:
 
     def run(self, command: str) -> DesktopActionResult:
         action = parse_desktop_action(command)
+        return self._run_action(action, opening_word="Opening")
+
+    def run_reply(self, reply: str) -> DesktopActionResult:
+        action = parse_reply_action(reply)
+        return self._run_action(action, opening_word="Opened")
+
+    def _run_action(
+        self, action: DesktopAction | None, opening_word: str
+    ) -> DesktopActionResult:
         if action is None:
             return DesktopActionResult(handled=False)
 
@@ -79,7 +110,7 @@ class DesktopActionRunner:
         else:
             self._open_app(action.target)
 
-        return DesktopActionResult(handled=True, message=f"Opening {action.name}.")
+        return DesktopActionResult(handled=True, message=f"{opening_word} {action.name}.")
 
     @staticmethod
     def _open_app(target: str) -> None:

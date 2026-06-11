@@ -33,6 +33,8 @@ def test_load_settings_reads_discord_values(tmp_path: Path):
                 "HERMES_OPENWAKEWORD_INFERENCE_FRAMEWORK=onnx",
                 "HERMES_WAKE_GREETING=Ready.",
                 "HERMES_REPLY_TIMEOUT_SECONDS=4.5",
+                "HERMES_FOLLOW_UP_ENABLED=false",
+                "HERMES_FOLLOW_UP_PROMPT=Next?",
                 "HERMES_AUTO_VOICE_MAX_SECONDS=6.5",
                 "HERMES_AUTO_VOICE_SILENCE_SECONDS=0.9",
                 "HERMES_AUTO_VOICE_SILENCE_THRESHOLD=0.02",
@@ -64,6 +66,8 @@ def test_load_settings_reads_discord_values(tmp_path: Path):
     assert settings.openwakeword_inference_framework == "onnx"
     assert settings.wake_greeting == "Ready."
     assert settings.reply_timeout_seconds == 4.5
+    assert settings.follow_up_enabled is False
+    assert settings.follow_up_prompt == "Next?"
     assert settings.auto_voice_max_seconds == 6.5
     assert settings.auto_voice_silence_seconds == 0.9
     assert settings.auto_voice_silence_threshold == 0.02
@@ -188,6 +192,8 @@ def test_load_settings_uses_voice_defaults(tmp_path: Path):
     assert settings.openwakeword_inference_framework == "onnx"
     assert settings.wake_greeting == "Hi, What Can I Help You?"
     assert settings.reply_timeout_seconds == 12.0
+    assert settings.follow_up_enabled is True
+    assert settings.follow_up_prompt == "Anything else?"
     assert settings.auto_voice_max_seconds == 8.0
     assert settings.auto_voice_silence_seconds == 1.2
     assert settings.auto_voice_silence_threshold == 0.012

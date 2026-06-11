@@ -236,11 +236,21 @@ def main() -> int:
             nonlocal waiting_for_hermes_reply
             write_log(f"HERMES: {message}")
             window.append_hermes_reply(message)
+            reply_action = desktop_actions.run_reply(message)
+            if reply_action.handled:
+                append_system(f"SYS: Agent local action: {reply_action.message}")
             waiting_for_hermes_reply = False
             if voice_mode_enabled:
-                words = max(1, len(message.split()))
-                speak_delay_ms = min(9000, max(1800, words * 330))
-                rearm_voice_mode(speak_delay_ms)
+                speak_delay_ms = min(9000, max(1800, max(1, len(message.split())) * 330))
+                if settings.follow_up_enabled and settings.follow_up_prompt:
+                    def speak_follow_up() -> None:
+                        window.append_hermes_reply(settings.follow_up_prompt)
+                        write_log(f"HERMES: {settings.follow_up_prompt}")
+                        rearm_voice_mode(greeting_delay_ms(settings.follow_up_prompt))
+
+                    QTimer.singleShot(speak_delay_ms, speak_follow_up)
+                else:
+                    rearm_voice_mode(speak_delay_ms)
 
         def handle_command_submitted(command: str) -> None:
             result = desktop_actions.run(command)
@@ -249,7 +259,17 @@ def main() -> int:
                 window.append_hermes_reply(result.message)
                 write_log(f"HERMES: {result.message}")
                 if voice_mode_enabled:
-                    rearm_voice_mode(greeting_delay_ms(result.message))
+                    if settings.follow_up_enabled and settings.follow_up_prompt:
+                        def speak_local_follow_up() -> None:
+                            window.append_hermes_reply(settings.follow_up_prompt)
+                            write_log(f"HERMES: {settings.follow_up_prompt}")
+                            rearm_voice_mode(greeting_delay_ms(settings.follow_up_prompt))
+
+                        QTimer.singleShot(
+                            greeting_delay_ms(result.message), speak_local_follow_up
+                        )
+                    else:
+                        rearm_voice_mode(greeting_delay_ms(result.message))
                 return
             worker_ref = worker
             if worker_ref is not None:
