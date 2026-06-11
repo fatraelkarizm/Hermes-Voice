@@ -4,7 +4,7 @@ from pathlib import Path
 from queue import Empty, Queue
 from threading import Event, Thread, current_thread
 from time import monotonic
-from typing import Mapping
+from typing import Any, Mapping
 
 import numpy as np
 from PySide6.QtCore import QObject, Signal, Slot
@@ -14,8 +14,15 @@ def normalize_wake_name(name: str) -> str:
     return Path(name).stem.lower().replace(" ", "_").replace("-", "_")
 
 
+def latest_score(raw_score: Any) -> float:
+    score_array = np.asarray(raw_score, dtype=np.float32).reshape(-1)
+    if score_array.size == 0:
+        return 0.0
+    return float(score_array[-1])
+
+
 def wake_score(
-    scores: Mapping[str, float],
+    scores: Mapping[str, Any],
     aliases: tuple[str, ...],
     threshold: float,
 ) -> tuple[bool, str, float]:
@@ -30,7 +37,7 @@ def wake_score(
             for expected_name in expected_names
         ):
             continue
-        score = float(raw_score)
+        score = latest_score(raw_score)
         if score > best_score:
             best_name = model_name
             best_score = score

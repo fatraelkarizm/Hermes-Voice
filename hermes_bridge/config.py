@@ -23,7 +23,7 @@ class DiscordSettings:
     require_wake_word: bool = True
     wake_backend: str = "hybrid"
     openwakeword_model_paths: tuple[str, ...] = ()
-    openwakeword_threshold: float = 0.5
+    openwakeword_threshold: float = 0.35
     openwakeword_debounce_seconds: float = 2.0
     openwakeword_chunk_size: int = 1280
     openwakeword_inference_framework: str = "onnx"
@@ -54,7 +54,7 @@ def load_settings(env_path: str | Path = ".env") -> DiscordSettings:
     wake_backend = values.get("HERMES_WAKE_BACKEND", "hybrid").strip() or "hybrid"
     openwakeword_models_text = values.get("HERMES_OPENWAKEWORD_MODELS", "").strip()
     openwakeword_threshold_text = (
-        values.get("HERMES_OPENWAKEWORD_THRESHOLD", "0.5").strip() or "0.5"
+        values.get("HERMES_OPENWAKEWORD_THRESHOLD", "0.35").strip() or "0.35"
     )
     openwakeword_debounce_text = (
         values.get("HERMES_OPENWAKEWORD_DEBOUNCE_SECONDS", "2.0").strip() or "2.0"

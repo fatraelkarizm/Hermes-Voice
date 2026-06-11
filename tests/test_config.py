@@ -180,7 +180,7 @@ def test_load_settings_uses_voice_defaults(tmp_path: Path):
     assert settings.require_wake_word is True
     assert settings.wake_backend == "hybrid"
     assert settings.openwakeword_model_paths == ()
-    assert settings.openwakeword_threshold == 0.5
+    assert settings.openwakeword_threshold == 0.35
     assert settings.openwakeword_debounce_seconds == 2.0
     assert settings.openwakeword_chunk_size == 1280
     assert settings.openwakeword_inference_framework == "onnx"

@@ -1,4 +1,4 @@
-from app import parse_args, strip_wake_phrase, strip_wake_word
+from app import format_log_line, parse_args, strip_wake_phrase, strip_wake_word
 
 
 def test_strip_wake_word_removes_wake_word_and_punctuation():
@@ -26,3 +26,11 @@ def test_parse_args_accepts_start_hidden_voice_mode():
 
     assert args.start_hidden is True
     assert args.voice_mode is True
+
+
+def test_format_log_line_includes_timestamp_and_message():
+    line = format_log_line("SYS: ready")
+
+    assert line.endswith("SYS: ready")
+    assert line.startswith("[")
+    assert "] " in line
