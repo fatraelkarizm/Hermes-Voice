@@ -27,12 +27,14 @@ def main() -> int:
     startup_path.write_text(
         "@echo off\n"
         f'cd /d "{project_root}"\n'
-        f'start "" "{python_exe}" "{app_path}" --start-minimized --voice-mode\n',
+        f'start "" "{python_exe}" "{app_path}" --start-hidden --voice-mode\n',
         encoding="utf-8",
     )
 
     print(f"Installed Hermes startup launcher: {startup_path}")
-    print("Hermes will start minimized with voice mode after Windows login.")
+    print(
+        "Hermes will listen in the background and show itself when you say the wake word."
+    )
     return 0
 
 

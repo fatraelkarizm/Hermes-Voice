@@ -20,7 +20,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--start-minimized",
         action="store_true",
-        help="Start Hermes minimized, useful for Windows startup.",
+        help="Start Hermes minimized.",
+    )
+    parser.add_argument(
+        "--start-hidden",
+        action="store_true",
+        help="Start Hermes in the background until the wake word is detected.",
     )
     parser.add_argument(
         "--voice-mode",
@@ -191,7 +196,9 @@ def main() -> int:
         if args.voice_mode:
             QTimer.singleShot(1000, lambda: handle_voice_mode_toggle(True))
 
-    if args.start_minimized:
+    if args.start_hidden:
+        pass
+    elif args.start_minimized:
         window.showMinimized()
     else:
         window.show()
