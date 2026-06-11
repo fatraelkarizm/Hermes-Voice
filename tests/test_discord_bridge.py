@@ -5,6 +5,7 @@ from hermes_bridge.discord_bridge import (
     bot_identity_warning,
     extract_reply_text,
     format_user_command,
+    is_target_channel,
     should_accept_message,
 )
 
@@ -80,6 +81,32 @@ def test_should_accept_message_accepts_configured_bot_with_embed_reply():
     incoming = message(author_id=987654321, content="", embeds=[embed])
 
     assert should_accept_message(incoming, hermes_bot_id=987654321) is True
+
+
+def test_is_target_channel_accepts_configured_channel():
+    incoming = SimpleNamespace(channel=SimpleNamespace(id=123))
+
+    assert is_target_channel(incoming, channel_id=123) is True
+
+
+def test_is_target_channel_accepts_thread_parent_id():
+    incoming = SimpleNamespace(channel=SimpleNamespace(id=999, parent_id=123))
+
+    assert is_target_channel(incoming, channel_id=123) is True
+
+
+def test_is_target_channel_accepts_thread_parent_object():
+    incoming = SimpleNamespace(
+        channel=SimpleNamespace(id=999, parent=SimpleNamespace(id=123))
+    )
+
+    assert is_target_channel(incoming, channel_id=123) is True
+
+
+def test_is_target_channel_rejects_other_threads():
+    incoming = SimpleNamespace(channel=SimpleNamespace(id=999, parent_id=456))
+
+    assert is_target_channel(incoming, channel_id=123) is False
 
 
 def test_bot_identity_warning_detects_same_bridge_and_hermes_bot():

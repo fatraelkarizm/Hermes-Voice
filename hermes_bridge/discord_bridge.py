@@ -91,6 +91,21 @@ def should_accept_message(message: Any, hermes_bot_id: int | None) -> bool:
     return bool(getattr(author, "bot", False))
 
 
+def is_target_channel(message: Any, channel_id: int) -> bool:
+    channel = getattr(message, "channel", None)
+    if channel is None:
+        return False
+
+    if getattr(channel, "id", None) == channel_id:
+        return True
+
+    if getattr(channel, "parent_id", None) == channel_id:
+        return True
+
+    parent = getattr(channel, "parent", None)
+    return getattr(parent, "id", None) == channel_id
+
+
 class DiscordBridgeWorker(QObject):
     system_event = Signal(str)
     status_changed = Signal(str)
@@ -171,7 +186,7 @@ class DiscordBridgeWorker(QObject):
         async def on_message(message: discord.Message) -> None:
             if client.user is not None and message.author.id == client.user.id:
                 return
-            if message.channel.id != self._settings.channel_id:
+            if not is_target_channel(message, self._settings.channel_id):
                 return
             if should_accept_message(message, self._settings.hermes_bot_id):
                 self.reply_received.emit(extract_reply_text(message))

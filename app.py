@@ -57,7 +57,7 @@ def write_log(message: str) -> None:
 
 def greeting_delay_ms(message: str) -> int:
     words = max(1, len(message.split()))
-    return min(6000, max(3500, words * 520))
+    return min(3500, max(1200, words * 330))
 
 
 def strip_wake_word(command: str, wake_word: str) -> str | None:

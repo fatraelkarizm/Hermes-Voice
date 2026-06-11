@@ -42,5 +42,8 @@ def test_format_log_line_includes_timestamp_and_message():
     assert "] " in line
 
 
-def test_greeting_delay_waits_long_enough_to_avoid_recording_tts_tail():
-    assert greeting_delay_ms("Hi, What Can I Help You?") >= 3500
+def test_greeting_delay_starts_command_capture_soon_after_wake_prompt():
+    delay = greeting_delay_ms("Hi, What Can I Help You?")
+
+    assert delay >= 1200
+    assert delay <= 2500
