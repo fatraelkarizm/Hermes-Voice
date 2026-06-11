@@ -24,7 +24,12 @@ class WhisperTranscriber:
 
     def transcribe(self, audio_path: str | Path) -> str:
         model = self._load_model()
-        segments, _info = model.transcribe(str(audio_path), beam_size=1)
+        segments, _info = model.transcribe(
+            str(audio_path),
+            beam_size=1,
+            condition_on_previous_text=False,
+            initial_prompt="The wake word is Hermes. The user may say Hey Hermes.",
+        )
         return normalize_segments(segments)
 
     def _load_model(self):

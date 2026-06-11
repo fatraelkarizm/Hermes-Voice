@@ -72,10 +72,16 @@ Start with hands-free voice mode enabled:
 Start hidden in the background until the wake word is detected:
 
 ```bash
+.venv\Scripts\python.exe tools\start_hermes_hidden.py
+```
+
+You can also run the app directly:
+
+```bash
 .venv\Scripts\python.exe app.py --start-hidden --voice-mode
 ```
 
-In hidden voice mode, the app process is running, but the window is not shown. Say the wake word, such as `Hermes`, and the UI will appear.
+In hidden voice mode, the app process is running, but the window is not shown. Say the wake word, such as `Hermes`, and the UI will appear. Runtime events are written to `hermes-voice.log` for troubleshooting.
 
 ## Voice modes
 
@@ -116,7 +122,7 @@ You can open that folder manually with:
 Win + R -> shell:startup
 ```
 
-After installation, Hermes starts automatically after Windows login in hidden voice mode. The UI will not appear immediately; it listens in the background and appears when you say the wake word.
+After installation, Hermes starts automatically after Windows login in hidden voice mode. The UI will not appear immediately; it listens in the background and appears when you say the wake word. If it does not appear, check `hermes-voice.log` in the project root.
 
 Remove the startup launcher:
 

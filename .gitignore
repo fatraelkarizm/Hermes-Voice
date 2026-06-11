@@ -7,6 +7,9 @@
 venv/
 env/
 
+# Runtime logs
+hermes-voice.log
+
 # Python cache / tooling
 __pycache__/
 *.py[cod]
