@@ -25,7 +25,7 @@ from hermes_bridge.ui.assets import resolve_asset_path
 class HermesCoreWidget(QWidget):
     def __init__(self) -> None:
         super().__init__()
-        self._logo = QPixmap(str(resolve_asset_path("Hermes-Logo.jpeg")))
+        self._logo = QPixmap(str(resolve_asset_path("hermes-logo.png")))
         self.setMinimumSize(230, 230)
 
     def paintEvent(self, event) -> None:  # noqa: N802

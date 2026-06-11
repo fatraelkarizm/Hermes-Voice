@@ -19,7 +19,15 @@ class DiscordSettings:
     voice_sample_rate: int = 16000
     tts_enabled: bool = True
     wake_word: str = "hermes"
+    wake_word_aliases: tuple[str, ...] = ("hey hermes", "hermes")
     require_wake_word: bool = True
+    wake_backend: str = "hybrid"
+    openwakeword_model_paths: tuple[str, ...] = ()
+    openwakeword_threshold: float = 0.5
+    openwakeword_debounce_seconds: float = 2.0
+    openwakeword_chunk_size: int = 1280
+    openwakeword_inference_framework: str = "onnx"
+    wake_greeting: str = "Hi, What Can I Help You?"
     auto_voice_max_seconds: float = 8.0
     auto_voice_silence_seconds: float = 1.2
     auto_voice_silence_threshold: float = 0.012
@@ -39,8 +47,27 @@ def load_settings(env_path: str | Path = ".env") -> DiscordSettings:
     voice_sample_rate_text = values.get("VOICE_SAMPLE_RATE", "16000").strip() or "16000"
     tts_enabled_text = values.get("HERMES_TTS_ENABLED", "true").strip() or "true"
     wake_word = values.get("HERMES_WAKE_WORD", "hermes").strip() or "hermes"
+    wake_word_aliases_text = values.get("HERMES_WAKE_WORD_ALIASES", "").strip()
     require_wake_word_text = (
         values.get("HERMES_REQUIRE_WAKE_WORD", "true").strip() or "true"
+    )
+    wake_backend = values.get("HERMES_WAKE_BACKEND", "hybrid").strip() or "hybrid"
+    openwakeword_models_text = values.get("HERMES_OPENWAKEWORD_MODELS", "").strip()
+    openwakeword_threshold_text = (
+        values.get("HERMES_OPENWAKEWORD_THRESHOLD", "0.5").strip() or "0.5"
+    )
+    openwakeword_debounce_text = (
+        values.get("HERMES_OPENWAKEWORD_DEBOUNCE_SECONDS", "2.0").strip() or "2.0"
+    )
+    openwakeword_chunk_size_text = (
+        values.get("HERMES_OPENWAKEWORD_CHUNK_SIZE", "1280").strip() or "1280"
+    )
+    openwakeword_inference_framework = (
+        values.get("HERMES_OPENWAKEWORD_INFERENCE_FRAMEWORK", "onnx").strip() or "onnx"
+    )
+    wake_greeting = (
+        values.get("HERMES_WAKE_GREETING", "Hi, What Can I Help You?").strip()
+        or "Hi, What Can I Help You?"
     )
     auto_voice_max_seconds_text = (
         values.get("HERMES_AUTO_VOICE_MAX_SECONDS", "8.0").strip() or "8.0"
@@ -72,7 +99,28 @@ def load_settings(env_path: str | Path = ".env") -> DiscordSettings:
     )
     voice_sample_rate = _parse_optional_int("VOICE_SAMPLE_RATE", voice_sample_rate_text)
     tts_enabled = _parse_bool("HERMES_TTS_ENABLED", tts_enabled_text)
+    wake_word_aliases = _parse_wake_aliases(wake_word_aliases_text, wake_word)
     require_wake_word = _parse_bool("HERMES_REQUIRE_WAKE_WORD", require_wake_word_text)
+    wake_backend = _parse_choice(
+        "HERMES_WAKE_BACKEND", wake_backend.lower(), {"hybrid", "whisper", "openwakeword"}
+    )
+    openwakeword_model_paths = _parse_path_list(openwakeword_models_text)
+    openwakeword_threshold = _parse_threshold(
+        "HERMES_OPENWAKEWORD_THRESHOLD", openwakeword_threshold_text
+    )
+    openwakeword_debounce_seconds = _parse_positive_float(
+        "HERMES_OPENWAKEWORD_DEBOUNCE_SECONDS", openwakeword_debounce_text
+    )
+    openwakeword_chunk_size = _parse_optional_int(
+        "HERMES_OPENWAKEWORD_CHUNK_SIZE", openwakeword_chunk_size_text
+    )
+    if openwakeword_chunk_size <= 0:
+        raise ConfigError("HERMES_OPENWAKEWORD_CHUNK_SIZE must be greater than 0")
+    openwakeword_inference_framework = _parse_choice(
+        "HERMES_OPENWAKEWORD_INFERENCE_FRAMEWORK",
+        openwakeword_inference_framework.lower(),
+        {"onnx", "tflite"},
+    )
     auto_voice_max_seconds = _parse_positive_float(
         "HERMES_AUTO_VOICE_MAX_SECONDS", auto_voice_max_seconds_text
     )
@@ -93,7 +141,15 @@ def load_settings(env_path: str | Path = ".env") -> DiscordSettings:
         voice_sample_rate=voice_sample_rate,
         tts_enabled=tts_enabled,
         wake_word=wake_word.lower(),
+        wake_word_aliases=wake_word_aliases,
         require_wake_word=require_wake_word,
+        wake_backend=wake_backend,
+        openwakeword_model_paths=openwakeword_model_paths,
+        openwakeword_threshold=openwakeword_threshold,
+        openwakeword_debounce_seconds=openwakeword_debounce_seconds,
+        openwakeword_chunk_size=openwakeword_chunk_size,
+        openwakeword_inference_framework=openwakeword_inference_framework,
+        wake_greeting=wake_greeting,
         auto_voice_max_seconds=auto_voice_max_seconds,
         auto_voice_silence_seconds=auto_voice_silence_seconds,
         auto_voice_silence_threshold=auto_voice_silence_threshold,
@@ -136,6 +192,38 @@ def _parse_bool(name: str, value: str) -> bool:
     if normalized in {"0", "false", "no", "off"}:
         return False
     raise ConfigError(f"{name} must be true or false")
+
+
+def _parse_choice(name: str, value: str, choices: set[str]) -> str:
+    if value in choices:
+        return value
+    raise ConfigError(f"{name} must be one of: {', '.join(sorted(choices))}")
+
+
+def _parse_path_list(value: str) -> tuple[str, ...]:
+    if not value:
+        return ()
+    normalized = value.replace(",", ";")
+    return tuple(part.strip() for part in normalized.split(";") if part.strip())
+
+
+def _parse_wake_aliases(value: str, wake_word: str) -> tuple[str, ...]:
+    aliases = [part.lower() for part in _parse_path_list(value)]
+    if not aliases:
+        aliases = [f"hey {wake_word.lower()}", wake_word.lower()]
+    unique_aliases = []
+    for alias in aliases:
+        normalized = " ".join(alias.split())
+        if normalized and normalized not in unique_aliases:
+            unique_aliases.append(normalized)
+    return tuple(sorted(unique_aliases, key=len, reverse=True))
+
+
+def _parse_threshold(name: str, value: str) -> float:
+    parsed = _parse_positive_float(name, value)
+    if parsed > 1:
+        raise ConfigError(f"{name} must be between 0 and 1")
+    return parsed
 
 
 def _parse_positive_float(name: str, value: str) -> float:

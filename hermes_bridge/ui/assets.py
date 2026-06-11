@@ -8,5 +8,14 @@ def project_root() -> Path:
 
 
 def resolve_asset_path(filename: str) -> Path:
-    return project_root() / filename
+    root = project_root()
+    requested = root / filename
+    if requested.exists():
+        return requested
 
+    requested_stem = Path(filename).stem.lower()
+    for candidate in root.iterdir():
+        if candidate.is_file() and candidate.stem.lower() == requested_stem:
+            return candidate
+
+    return requested

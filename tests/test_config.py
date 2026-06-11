@@ -23,7 +23,15 @@ def test_load_settings_reads_discord_values(tmp_path: Path):
                 "VOICE_SAMPLE_RATE=22050",
                 "HERMES_TTS_ENABLED=false",
                 "HERMES_WAKE_WORD=jarvis",
+                "HERMES_WAKE_WORD_ALIASES=hey jarvis,jarvis",
                 "HERMES_REQUIRE_WAKE_WORD=false",
+                "HERMES_WAKE_BACKEND=openwakeword",
+                "HERMES_OPENWAKEWORD_MODELS=models/hey_jarvis.onnx;models/jarvis.onnx",
+                "HERMES_OPENWAKEWORD_THRESHOLD=0.7",
+                "HERMES_OPENWAKEWORD_DEBOUNCE_SECONDS=1.5",
+                "HERMES_OPENWAKEWORD_CHUNK_SIZE=960",
+                "HERMES_OPENWAKEWORD_INFERENCE_FRAMEWORK=onnx",
+                "HERMES_WAKE_GREETING=Ready.",
                 "HERMES_AUTO_VOICE_MAX_SECONDS=6.5",
                 "HERMES_AUTO_VOICE_SILENCE_SECONDS=0.9",
                 "HERMES_AUTO_VOICE_SILENCE_THRESHOLD=0.02",
@@ -42,7 +50,18 @@ def test_load_settings_reads_discord_values(tmp_path: Path):
     assert settings.voice_sample_rate == 22050
     assert settings.tts_enabled is False
     assert settings.wake_word == "jarvis"
+    assert settings.wake_word_aliases == ("hey jarvis", "jarvis")
     assert settings.require_wake_word is False
+    assert settings.wake_backend == "openwakeword"
+    assert settings.openwakeword_model_paths == (
+        "models/hey_jarvis.onnx",
+        "models/jarvis.onnx",
+    )
+    assert settings.openwakeword_threshold == 0.7
+    assert settings.openwakeword_debounce_seconds == 1.5
+    assert settings.openwakeword_chunk_size == 960
+    assert settings.openwakeword_inference_framework == "onnx"
+    assert settings.wake_greeting == "Ready."
     assert settings.auto_voice_max_seconds == 6.5
     assert settings.auto_voice_silence_seconds == 0.9
     assert settings.auto_voice_silence_threshold == 0.02
@@ -157,7 +176,15 @@ def test_load_settings_uses_voice_defaults(tmp_path: Path):
     assert settings.voice_sample_rate == 16000
     assert settings.tts_enabled is True
     assert settings.wake_word == "hermes"
+    assert settings.wake_word_aliases == ("hey hermes", "hermes")
     assert settings.require_wake_word is True
+    assert settings.wake_backend == "hybrid"
+    assert settings.openwakeword_model_paths == ()
+    assert settings.openwakeword_threshold == 0.5
+    assert settings.openwakeword_debounce_seconds == 2.0
+    assert settings.openwakeword_chunk_size == 1280
+    assert settings.openwakeword_inference_framework == "onnx"
+    assert settings.wake_greeting == "Hi, What Can I Help You?"
     assert settings.auto_voice_max_seconds == 8.0
     assert settings.auto_voice_silence_seconds == 1.2
     assert settings.auto_voice_silence_threshold == 0.012
