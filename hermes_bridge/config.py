@@ -28,6 +28,7 @@ class DiscordSettings:
     openwakeword_chunk_size: int = 1280
     openwakeword_inference_framework: str = "onnx"
     wake_greeting: str = "Hi, What Can I Help You?"
+    reply_timeout_seconds: float = 12.0
     auto_voice_max_seconds: float = 8.0
     auto_voice_silence_seconds: float = 1.2
     auto_voice_silence_threshold: float = 0.012
@@ -68,6 +69,9 @@ def load_settings(env_path: str | Path = ".env") -> DiscordSettings:
     wake_greeting = (
         values.get("HERMES_WAKE_GREETING", "Hi, What Can I Help You?").strip()
         or "Hi, What Can I Help You?"
+    )
+    reply_timeout_seconds_text = (
+        values.get("HERMES_REPLY_TIMEOUT_SECONDS", "12.0").strip() or "12.0"
     )
     auto_voice_max_seconds_text = (
         values.get("HERMES_AUTO_VOICE_MAX_SECONDS", "8.0").strip() or "8.0"
@@ -121,6 +125,9 @@ def load_settings(env_path: str | Path = ".env") -> DiscordSettings:
         openwakeword_inference_framework.lower(),
         {"onnx", "tflite"},
     )
+    reply_timeout_seconds = _parse_positive_float(
+        "HERMES_REPLY_TIMEOUT_SECONDS", reply_timeout_seconds_text
+    )
     auto_voice_max_seconds = _parse_positive_float(
         "HERMES_AUTO_VOICE_MAX_SECONDS", auto_voice_max_seconds_text
     )
@@ -150,6 +157,7 @@ def load_settings(env_path: str | Path = ".env") -> DiscordSettings:
         openwakeword_chunk_size=openwakeword_chunk_size,
         openwakeword_inference_framework=openwakeword_inference_framework,
         wake_greeting=wake_greeting,
+        reply_timeout_seconds=reply_timeout_seconds,
         auto_voice_max_seconds=auto_voice_max_seconds,
         auto_voice_silence_seconds=auto_voice_silence_seconds,
         auto_voice_silence_threshold=auto_voice_silence_threshold,

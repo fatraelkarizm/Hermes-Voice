@@ -22,6 +22,10 @@ from PySide6.QtWidgets import (
 from hermes_bridge.ui.assets import resolve_asset_path
 
 
+def should_hide_instead_of_close(voice_mode_enabled: bool) -> bool:
+    return voice_mode_enabled
+
+
 class HermesCoreWidget(QWidget):
     def __init__(self) -> None:
         super().__init__()
@@ -133,6 +137,7 @@ class HermesMainWindow(QMainWindow):
         self._drag_position: QPoint | None = None
         self._tts_enabled = tts_enabled
         self._tts_unavailable_reported = False
+        self._voice_mode_enabled = False
         self._speech = self._create_speech_engine()
         self.setWindowTitle("Hermes Voice Bridge")
         self.setMinimumSize(820, 560)
@@ -200,6 +205,7 @@ class HermesMainWindow(QMainWindow):
         self.set_status("READY")
 
     def set_voice_mode_enabled(self, enabled: bool) -> None:
+        self._voice_mode_enabled = enabled
         self._voice_mode_button.blockSignals(True)
         self._voice_mode_button.setChecked(enabled)
         self._voice_mode_button.blockSignals(False)
@@ -256,6 +262,14 @@ class HermesMainWindow(QMainWindow):
         if event.buttons() == Qt.LeftButton and self._drag_position is not None:
             self.move(event.globalPosition().toPoint() - self._drag_position)
             event.accept()
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        if should_hide_instead_of_close(self._voice_mode_enabled):
+            event.ignore()
+            self.hide()
+            self.append_system("SYS: Window hidden; voice mode still listening.")
+            return
+        super().closeEvent(event)
 
     def _build_ui(self) -> None:
         shell = QFrame()

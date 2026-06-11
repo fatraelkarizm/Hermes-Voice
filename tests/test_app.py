@@ -1,4 +1,10 @@
-from app import format_log_line, parse_args, strip_wake_phrase, strip_wake_word
+from app import (
+    format_log_line,
+    greeting_delay_ms,
+    parse_args,
+    strip_wake_phrase,
+    strip_wake_word,
+)
 
 
 def test_strip_wake_word_removes_wake_word_and_punctuation():
@@ -34,3 +40,7 @@ def test_format_log_line_includes_timestamp_and_message():
     assert line.endswith("SYS: ready")
     assert line.startswith("[")
     assert "] " in line
+
+
+def test_greeting_delay_waits_long_enough_to_avoid_recording_tts_tail():
+    assert greeting_delay_ms("Hi, What Can I Help You?") >= 3500

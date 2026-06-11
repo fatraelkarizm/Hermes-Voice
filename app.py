@@ -54,6 +54,11 @@ def write_log(message: str) -> None:
         pass
 
 
+def greeting_delay_ms(message: str) -> int:
+    words = max(1, len(message.split()))
+    return min(6000, max(3500, words * 520))
+
+
 def strip_wake_word(command: str, wake_word: str) -> str | None:
     pattern = rf"\b{re.escape(wake_word.lower())}\b"
     match = re.search(pattern, command.lower())
@@ -141,10 +146,6 @@ def main() -> int:
                 return
             start_auto_voice(delay_ms)
 
-        def greeting_delay_ms(message: str) -> int:
-            words = max(1, len(message.split()))
-            return min(3000, max(1000, words * 260))
-
         def greet_after_wake() -> None:
             greeting = settings.wake_greeting
             if greeting:
@@ -160,6 +161,15 @@ def main() -> int:
                 f"SYS: Wake word detected by openWakeWord ({model_name}, {score:.2f})."
             )
             greet_after_wake()
+
+        def handle_reply_timeout() -> None:
+            nonlocal waiting_for_hermes_reply
+            if not waiting_for_hermes_reply:
+                return
+            waiting_for_hermes_reply = False
+            append_system("SYS: Hermes reply timeout. Re-arming wake word.")
+            if voice_mode_enabled:
+                rearm_voice_mode()
 
         def handle_voice_mode_toggle(enabled: bool) -> None:
             nonlocal voice_mode_enabled, wake_word_armed
@@ -215,6 +225,10 @@ def main() -> int:
             window.submit_voice_transcript(command)
             window.set_voice_ready()
             wake_word_armed = voice_mode_enabled and settings.require_wake_word
+            QTimer.singleShot(
+                int(settings.reply_timeout_seconds * 1000),
+                handle_reply_timeout,
+            )
 
         def handle_hermes_reply(message: str) -> None:
             nonlocal waiting_for_hermes_reply
