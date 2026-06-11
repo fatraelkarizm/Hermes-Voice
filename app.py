@@ -47,6 +47,8 @@ def strip_wake_word(command: str, wake_word: str) -> str | None:
 def main() -> int:
     args = parse_args(sys.argv[1:])
     app = QApplication([sys.argv[0]])
+    if args.start_hidden:
+        app.setQuitOnLastWindowClosed(False)
     app.setStyleSheet(APP_STYLE)
 
     window = HermesMainWindow()
