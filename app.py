@@ -11,6 +11,7 @@ from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
 from hermes_bridge.config import ConfigError, load_settings
+from hermes_bridge.desktop_actions import DesktopActionRunner
 from hermes_bridge.discord_bridge import DiscordBridgeWorker
 from hermes_bridge.ui.main_window import HermesMainWindow
 from hermes_bridge.ui.styles import APP_STYLE
@@ -112,6 +113,7 @@ def main() -> int:
         append_system("SYS: Fill .env, then restart the bridge.")
     else:
         window.set_tts_enabled(settings.tts_enabled)
+        desktop_actions = DesktopActionRunner()
 
         def start_auto_voice(delay_ms: int = 250) -> None:
             worker_ref = voice_worker
@@ -240,6 +242,19 @@ def main() -> int:
                 speak_delay_ms = min(9000, max(1800, words * 330))
                 rearm_voice_mode(speak_delay_ms)
 
+        def handle_command_submitted(command: str) -> None:
+            result = desktop_actions.run(command)
+            if result.handled:
+                append_system(f"SYS: Local action: {result.message}")
+                window.append_hermes_reply(result.message)
+                write_log(f"HERMES: {result.message}")
+                if voice_mode_enabled:
+                    rearm_voice_mode(greeting_delay_ms(result.message))
+                return
+            worker_ref = worker
+            if worker_ref is not None:
+                worker_ref.send_command(command)
+
         voice_worker = VoiceInputWorker(
             sample_rate=settings.voice_sample_rate,
             model_size=settings.whisper_model_size,
@@ -324,7 +339,7 @@ def main() -> int:
                 "SYS: Waiting for Hermes reply. If nothing appears, the Hermes bot is likely ignoring bot-authored messages."
             )
         )
-        window.command_submitted.connect(worker.send_command)
+        window.command_submitted.connect(handle_command_submitted)
         app.aboutToQuit.connect(worker.stop)
 
         worker_thread.start()

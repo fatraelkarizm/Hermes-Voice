@@ -81,6 +81,25 @@ Wake-word model binaries are ignored by git. Reinstall them with:
 .\.venv\Scripts\python.exe tools\setup_wakeword.py
 ```
 
+## Local Desktop Actions
+
+Some commands are handled locally before they go to Discord:
+
+```text
+open youtube
+buka google
+open github
+open chatgpt
+open chrome
+open discord
+open vscode
+open spotify
+open notepad
+open calculator
+```
+
+These actions use a safe-list. Unknown desktop commands are sent to Hermes through Discord instead.
+
 ## Troubleshooting
 
 Logs are written to:

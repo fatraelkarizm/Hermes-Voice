@@ -3,15 +3,17 @@ from types import SimpleNamespace
 from hermes_bridge.config import DiscordSettings
 from hermes_bridge.discord_bridge import (
     bot_identity_warning,
+    extract_reply_text,
     format_user_command,
     should_accept_message,
 )
 
 
-def message(author_id: int, content: str = "hello", bot: bool = True):
+def message(author_id: int, content: str = "hello", bot: bool = True, embeds=None):
     return SimpleNamespace(
         author=SimpleNamespace(id=author_id, bot=bot),
         content=content,
+        embeds=embeds or [],
     )
 
 
@@ -51,6 +53,33 @@ def test_should_accept_message_rejects_empty_content():
     incoming = message(author_id=987654321, content="   ")
 
     assert should_accept_message(incoming, hermes_bot_id=987654321) is False
+
+
+def test_extract_reply_text_prefers_final_terminal_output():
+    incoming = message(
+        author_id=987654321,
+        content="@Agentic This is 2 times 2.\n💻 terminal\npython - <<'PY' ...\n4",
+    )
+
+    assert extract_reply_text(incoming) == "4"
+
+
+def test_extract_reply_text_reads_embed_fields_when_content_is_empty():
+    embed = SimpleNamespace(
+        title="terminal",
+        description="python - <<'PY' ...",
+        fields=[SimpleNamespace(name="output", value="4")],
+    )
+    incoming = message(author_id=987654321, content="", embeds=[embed])
+
+    assert extract_reply_text(incoming) == "4"
+
+
+def test_should_accept_message_accepts_configured_bot_with_embed_reply():
+    embed = SimpleNamespace(title="result", description="4", fields=[])
+    incoming = message(author_id=987654321, content="", embeds=[embed])
+
+    assert should_accept_message(incoming, hermes_bot_id=987654321) is True
 
 
 def test_bot_identity_warning_detects_same_bridge_and_hermes_bot():

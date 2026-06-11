@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from typing import Any
 
 import discord
@@ -34,9 +35,50 @@ def bot_identity_warning(settings: DiscordSettings, connected_bot_id: int | None
     return None
 
 
-def should_accept_message(message: Any, hermes_bot_id: int | None) -> bool:
+def extract_reply_text(message: Any) -> str:
+    parts: list[str] = []
     content = getattr(message, "content", "")
-    if not content or not content.strip():
+    if content and content.strip():
+        parts.append(content.strip())
+
+    for embed in getattr(message, "embeds", []) or []:
+        description = getattr(embed, "description", "")
+        if description and description.strip():
+            parts.append(description.strip())
+        for field in getattr(embed, "fields", []) or []:
+            value = getattr(field, "value", "")
+            if value and str(value).strip():
+                parts.append(str(value).strip())
+
+    return simplify_reply_text("\n".join(parts))
+
+
+def simplify_reply_text(text: str) -> str:
+    cleaned_lines = []
+    for raw_line in text.replace("```", "\n").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        lowered = line.lower()
+        if lowered in {"terminal", "💻 terminal", "python", "bash", "powershell"}:
+            continue
+        if line.startswith("@"):
+            continue
+        if re.match(r"^(python|py|bash|pwsh|powershell)\b", lowered):
+            continue
+        cleaned_lines.append(line)
+
+    if not cleaned_lines:
+        return ""
+
+    for line in reversed(cleaned_lines):
+        if re.fullmatch(r"[-+]?\d+(\.\d+)?", line):
+            return line
+    return cleaned_lines[-1] if len(cleaned_lines) > 1 else cleaned_lines[0]
+
+
+def should_accept_message(message: Any, hermes_bot_id: int | None) -> bool:
+    if not extract_reply_text(message):
         return False
 
     author = getattr(message, "author", None)
@@ -132,7 +174,7 @@ class DiscordBridgeWorker(QObject):
             if message.channel.id != self._settings.channel_id:
                 return
             if should_accept_message(message, self._settings.hermes_bot_id):
-                self.reply_received.emit(message.content.strip())
+                self.reply_received.emit(extract_reply_text(message))
                 return
 
             author_id = getattr(message.author, "id", None)
