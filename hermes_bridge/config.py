@@ -29,7 +29,7 @@ class DiscordSettings:
     openwakeword_inference_framework: str = "onnx"
     wake_greeting: str = "Hi, What Can I Help You?"
     reply_timeout_seconds: float = 12.0
-    follow_up_enabled: bool = True
+    follow_up_enabled: bool = False
     follow_up_prompt: str = "Anything else?"
     auto_voice_max_seconds: float = 8.0
     auto_voice_silence_seconds: float = 1.2
@@ -76,7 +76,7 @@ def load_settings(env_path: str | Path = ".env") -> DiscordSettings:
         values.get("HERMES_REPLY_TIMEOUT_SECONDS", "12.0").strip() or "12.0"
     )
     follow_up_enabled_text = (
-        values.get("HERMES_FOLLOW_UP_ENABLED", "true").strip() or "true"
+        values.get("HERMES_FOLLOW_UP_ENABLED", "false").strip() or "false"
     )
     follow_up_prompt = (
         values.get("HERMES_FOLLOW_UP_PROMPT", "Anything else?").strip()

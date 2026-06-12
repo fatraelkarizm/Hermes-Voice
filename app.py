@@ -5,6 +5,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
+from tempfile import gettempdir
 from threading import Thread
 
 from PySide6.QtCore import QTimer
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import QApplication
 from hermes_bridge.config import ConfigError, load_settings
 from hermes_bridge.desktop_actions import DesktopActionRunner
 from hermes_bridge.discord_bridge import DiscordBridgeWorker
+from hermes_bridge.single_instance import SingleInstanceLock
 from hermes_bridge.ui.main_window import HermesMainWindow
 from hermes_bridge.ui.styles import APP_STYLE
 from hermes_bridge.voice.input_worker import VoiceInputWorker
@@ -60,6 +62,100 @@ def greeting_delay_ms(message: str) -> int:
     return min(3500, max(1200, words * 330))
 
 
+def _voice_text_signature(text: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", text.lower()).split())
+
+
+def is_self_echo_transcript(
+    transcript: str,
+    prompts: tuple[str, ...],
+    max_extra_words: int = 6,
+) -> bool:
+    command_signature = _voice_text_signature(transcript)
+    if not command_signature:
+        return False
+
+    command_words = command_signature.split()
+    for prompt in prompts:
+        prompt_signature = _voice_text_signature(prompt)
+        if not prompt_signature:
+            continue
+        prompt_words = prompt_signature.split()
+        if (
+            prompt_signature in command_signature
+            and len(command_words) <= len(prompt_words) + max_extra_words
+        ):
+            return True
+    return False
+
+
+def is_spurious_auto_transcript(transcript: str) -> bool:
+    normalized = _voice_text_signature(transcript)
+    if not normalized:
+        return True
+    if normalized in {
+        "you",
+        "hi",
+        "hello",
+        "thank you",
+        "thank you for watching",
+        "thanks for watching",
+        "bye",
+        "bye bye",
+    }:
+        return True
+    return False
+
+
+def is_voice_stop_command(command: str, wake_phrases: tuple[str, ...]) -> bool:
+    stripped = strip_wake_phrase(command, wake_phrases)
+    normalized = _voice_text_signature(stripped if stripped is not None else command)
+    if normalized in {
+        "stop",
+        "stopped",
+        "stop listening",
+        "stop voice",
+        "voice stop",
+        "turn off voice",
+        "matikan voice",
+        "matikan suara",
+        "berhenti",
+        "berhenti dulu",
+    }:
+        return True
+
+    words = normalized.split()
+    if len(words) <= 4 and words[-1:] in (["stop"], ["stopped"]):
+        return normalized not in {"dont stop", "don t stop", "do not stop"}
+
+    return any(
+        phrase in normalized
+        for phrase in ("stop listening", "stop voice", "turn off voice")
+    )
+
+
+def is_app_shutdown_command(command: str, wake_phrases: tuple[str, ...]) -> bool:
+    stripped = strip_wake_phrase(command, wake_phrases)
+    normalized = _voice_text_signature(stripped if stripped is not None else command)
+    return normalized in {
+        "shutdown",
+        "shutdown app",
+        "shut down",
+        "shut down app",
+        "quit",
+        "quit app",
+        "quit hermes",
+        "exit",
+        "exit app",
+        "exit hermes",
+        "close app",
+        "close this app",
+        "close hermes",
+        "matikan app",
+        "matikan hermes",
+    }
+
+
 def strip_wake_word(command: str, wake_word: str) -> str | None:
     pattern = rf"\b{re.escape(wake_word.lower())}\b"
     match = re.search(pattern, command.lower())
@@ -83,7 +179,13 @@ def strip_wake_phrase(command: str, wake_phrases: tuple[str, ...]) -> str | None
 def main() -> int:
     args = parse_args(sys.argv[1:])
     write_log(f"Starting Hermes Voice with args: {sys.argv[1:]}")
+    instance_lock = SingleInstanceLock(Path(gettempdir()) / "hermes-voice.lock")
+    if not instance_lock.acquire():
+        write_log("SYS: Another Hermes Voice instance is already running. Exiting.")
+        return 0
+
     app = QApplication([sys.argv[0]])
+    app.aboutToQuit.connect(instance_lock.release)
     if args.start_hidden:
         app.setQuitOnLastWindowClosed(False)
     app.setStyleSheet(APP_STYLE)
@@ -100,6 +202,7 @@ def main() -> int:
     voice_mode_enabled = False
     wake_word_armed = args.voice_mode
     waiting_for_hermes_reply = False
+    voice_generation = 0
 
     worker_thread: Thread | None = None
     worker: DiscordBridgeWorker | None = None
@@ -114,6 +217,43 @@ def main() -> int:
     else:
         window.set_tts_enabled(settings.tts_enabled)
         desktop_actions = DesktopActionRunner()
+
+        def bump_voice_generation() -> int:
+            nonlocal voice_generation
+            voice_generation += 1
+            return voice_generation
+
+        def stop_voice_capture() -> None:
+            if wake_listener is not None:
+                wake_listener.stop_listening()
+            if voice_worker is not None:
+                voice_worker.cancel_recording()
+
+        def disable_voice_mode(message: str) -> None:
+            nonlocal voice_mode_enabled, wake_word_armed, waiting_for_hermes_reply
+            bump_voice_generation()
+            voice_mode_enabled = False
+            wake_word_armed = False
+            waiting_for_hermes_reply = False
+            stop_voice_capture()
+            window.stop_speech()
+            window.set_voice_mode_enabled(False)
+            window.set_voice_ready()
+            append_system(message)
+
+        def shutdown_app(message: str) -> None:
+            nonlocal voice_mode_enabled, wake_word_armed, waiting_for_hermes_reply
+            bump_voice_generation()
+            voice_mode_enabled = False
+            wake_word_armed = False
+            waiting_for_hermes_reply = False
+            stop_voice_capture()
+            window.stop_speech()
+            worker_ref = worker
+            if worker_ref is not None:
+                worker_ref.stop()
+            append_system(message)
+            app.quit()
 
         def start_auto_voice(delay_ms: int = 250) -> None:
             worker_ref = voice_worker
@@ -143,13 +283,25 @@ def main() -> int:
             QTimer.singleShot(delay_ms, start_if_still_enabled)
 
         def rearm_voice_mode(delay_ms: int = 750) -> None:
-            if wake_listener is not None and settings.require_wake_word:
-                start_wake_listening(delay_ms)
-                return
-            start_auto_voice(delay_ms)
+            generation = voice_generation
+
+            def rearm_if_current() -> None:
+                if (
+                    generation != voice_generation
+                    or not voice_mode_enabled
+                    or waiting_for_hermes_reply
+                ):
+                    return
+                if wake_listener is not None and settings.require_wake_word:
+                    start_wake_listening(0)
+                    return
+                start_auto_voice(0)
+
+            QTimer.singleShot(delay_ms, rearm_if_current)
 
         def greet_after_wake() -> None:
             greeting = settings.wake_greeting
+            bump_voice_generation()
             if greeting:
                 window.append_hermes_reply(greeting)
                 write_log(f"HERMES: {greeting}")
@@ -175,6 +327,7 @@ def main() -> int:
 
         def handle_voice_mode_toggle(enabled: bool) -> None:
             nonlocal voice_mode_enabled, wake_word_armed
+            bump_voice_generation()
             voice_mode_enabled = enabled
             wake_word_armed = enabled and settings.require_wake_word
             window.set_voice_mode_enabled(enabled)
@@ -200,6 +353,27 @@ def main() -> int:
             if not command:
                 window.set_voice_ready()
                 rearm_voice_mode(750)
+                return
+
+            if is_app_shutdown_command(command, settings.wake_word_aliases):
+                shutdown_app("SYS: Hermes Voice shutdown by voice command.")
+                return
+
+            prompts = (settings.wake_greeting, settings.follow_up_prompt)
+            if is_self_echo_transcript(command, prompts):
+                append_system(f"SYS: Ignored Hermes self-echo transcript: {command}")
+                window.set_voice_ready()
+                rearm_voice_mode(1500)
+                return
+
+            if is_voice_stop_command(command, settings.wake_word_aliases):
+                disable_voice_mode("SYS: Voice mode stopped by voice command.")
+                return
+
+            if voice_mode_enabled and is_spurious_auto_transcript(command):
+                append_system(f"SYS: Ignored low-confidence voice transcript: {command}")
+                window.set_voice_ready()
+                rearm_voice_mode(1500)
                 return
 
             if voice_mode_enabled and wake_word_armed and wake_listener is None:
@@ -234,6 +408,8 @@ def main() -> int:
 
         def handle_hermes_reply(message: str) -> None:
             nonlocal waiting_for_hermes_reply
+            stop_voice_capture()
+            generation = bump_voice_generation()
             write_log(f"HERMES: {message}")
             window.append_hermes_reply(message)
             reply_action = desktop_actions.run_reply(message)
@@ -244,6 +420,8 @@ def main() -> int:
                 speak_delay_ms = min(9000, max(1800, max(1, len(message.split())) * 330))
                 if settings.follow_up_enabled and settings.follow_up_prompt:
                     def speak_follow_up() -> None:
+                        if generation != voice_generation or not voice_mode_enabled:
+                            return
                         window.append_hermes_reply(settings.follow_up_prompt)
                         write_log(f"HERMES: {settings.follow_up_prompt}")
                         rearm_voice_mode(greeting_delay_ms(settings.follow_up_prompt))
@@ -253,6 +431,15 @@ def main() -> int:
                     rearm_voice_mode(speak_delay_ms)
 
         def handle_command_submitted(command: str) -> None:
+            if is_app_shutdown_command(command, settings.wake_word_aliases):
+                shutdown_app("SYS: Hermes Voice shutdown by command.")
+                return
+
+            if is_voice_stop_command(command, settings.wake_word_aliases):
+                disable_voice_mode("SYS: Voice mode stopped by command.")
+                return
+
+            bump_voice_generation()
             result = desktop_actions.run(command)
             if result.handled:
                 append_system(f"SYS: Local action: {result.message}")
@@ -261,6 +448,8 @@ def main() -> int:
                 if voice_mode_enabled:
                     if settings.follow_up_enabled and settings.follow_up_prompt:
                         def speak_local_follow_up() -> None:
+                            if not voice_mode_enabled:
+                                return
                             window.append_hermes_reply(settings.follow_up_prompt)
                             write_log(f"HERMES: {settings.follow_up_prompt}")
                             rearm_voice_mode(greeting_delay_ms(settings.follow_up_prompt))
@@ -332,6 +521,12 @@ def main() -> int:
         window.voice_pressed.connect(voice_worker.start_recording)
         window.voice_released.connect(voice_worker.stop_recording)
         window.voice_mode_toggled.connect(handle_voice_mode_toggle)
+        window.voice_stop_requested.connect(
+            lambda: disable_voice_mode("SYS: Voice mode stopped by button.")
+        )
+        window.app_shutdown_requested.connect(
+            lambda: shutdown_app("SYS: Hermes Voice shutdown by button.")
+        )
         app.aboutToQuit.connect(voice_worker.stop_recording)
         append_system(
             f"SYS: Push-to-talk voice ready with faster-whisper '{settings.whisper_model_size}'."

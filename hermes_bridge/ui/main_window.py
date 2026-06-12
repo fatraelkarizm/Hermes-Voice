@@ -131,6 +131,8 @@ class HermesMainWindow(QMainWindow):
     voice_pressed = Signal()
     voice_released = Signal()
     voice_mode_toggled = Signal(bool)
+    voice_stop_requested = Signal()
+    app_shutdown_requested = Signal()
 
     def __init__(self, tts_enabled: bool = True) -> None:
         super().__init__()
@@ -154,6 +156,8 @@ class HermesMainWindow(QMainWindow):
         self._input = QLineEdit()
         self._hold_button = QPushButton("HOLD TO TALK")
         self._voice_mode_button = QPushButton("VOICE MODE OFF")
+        self._stop_voice_button = QPushButton("STOP VOICE")
+        self._shutdown_button = QPushButton("SHUTDOWN APP")
 
         self._build_ui()
         self._start_clock()
@@ -187,6 +191,10 @@ class HermesMainWindow(QMainWindow):
         self._speech.stop()
         self._speech.say(text)
 
+    def stop_speech(self) -> None:
+        if self._speech is not None:
+            self._speech.stop()
+
     def keep_command_for_retry(self, message: str) -> None:
         self.append_system(message)
 
@@ -212,6 +220,7 @@ class HermesMainWindow(QMainWindow):
         self._voice_mode_button.setText(
             "VOICE MODE ON" if enabled else "VOICE MODE OFF"
         )
+        self._stop_voice_button.setEnabled(enabled)
         self.append_system(
             "SYS: Voice mode enabled." if enabled else "SYS: Voice mode disabled."
         )
@@ -351,6 +360,11 @@ class HermesMainWindow(QMainWindow):
         self._voice_mode_button.setCheckable(True)
         self._voice_mode_button.toggled.connect(self._toggle_voice_mode)
         layout.addWidget(self._voice_mode_button)
+        self._stop_voice_button.setEnabled(False)
+        self._stop_voice_button.clicked.connect(self.voice_stop_requested.emit)
+        layout.addWidget(self._stop_voice_button)
+        self._shutdown_button.clicked.connect(self.app_shutdown_requested.emit)
+        layout.addWidget(self._shutdown_button)
         return panel
 
     def _right_panel(self) -> QWidget:

@@ -86,6 +86,13 @@ class VoiceInputWorker(QObject):
 
     @Slot()
     def stop_recording(self) -> None:
+        self._finish_recording(transcribe=True)
+
+    @Slot()
+    def cancel_recording(self) -> None:
+        self._finish_recording(transcribe=False)
+
+    def _finish_recording(self, transcribe: bool) -> None:
         with self._lock:
             if not self._is_recording:
                 return
@@ -109,7 +116,8 @@ class VoiceInputWorker(QObject):
             self.voice_error.emit(f"Voice stop failed: {exc}")
             return
 
-        Thread(target=self._transcribe_chunks, args=(chunks,), daemon=True).start()
+        if transcribe:
+            Thread(target=self._transcribe_chunks, args=(chunks,), daemon=True).start()
 
     def _on_audio(self, indata, frames, time, status) -> None:
         del frames, time

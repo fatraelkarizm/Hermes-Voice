@@ -24,7 +24,12 @@ class WhisperTranscriber:
 
     def transcribe(self, audio_path: str | Path) -> str:
         model = self._load_model()
-        segments, _info = model.transcribe(str(audio_path), beam_size=1)
+        segments, _info = model.transcribe(
+            str(audio_path),
+            beam_size=1,
+            vad_filter=True,
+            condition_on_previous_text=False,
+        )
         return normalize_segments(segments)
 
     def _load_model(self):

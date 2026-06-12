@@ -192,7 +192,7 @@ def test_load_settings_uses_voice_defaults(tmp_path: Path):
     assert settings.openwakeword_inference_framework == "onnx"
     assert settings.wake_greeting == "Hi, What Can I Help You?"
     assert settings.reply_timeout_seconds == 12.0
-    assert settings.follow_up_enabled is True
+    assert settings.follow_up_enabled is False
     assert settings.follow_up_prompt == "Anything else?"
     assert settings.auto_voice_max_seconds == 8.0
     assert settings.auto_voice_silence_seconds == 1.2
